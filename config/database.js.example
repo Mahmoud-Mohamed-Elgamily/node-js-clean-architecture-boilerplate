@@ -1,0 +1,9 @@
+module.exports = {
+  development: {
+    database: 'development_database_name',
+  },
+  test: {
+    database: 'test_database_name',
+  },
+  production: process.env.DATABASE_URL
+};
