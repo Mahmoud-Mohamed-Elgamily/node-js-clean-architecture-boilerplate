@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const swaggerDocument = require('../src/interfaces/http/swagger/swagger.json');
+const isWin = process.platform === 'win32';
 
 // constants to provive content inside files
 const dir = process.argv[2];
@@ -150,10 +152,19 @@ GetAll${capitalDir}s.setOutputs(['SUCCESS', 'ERROR']);
 
 module.exports = GetAll${capitalDir}s;
 `;
+const index = `module.exports = {
+  GetAll${capitalDir}s: require('./GetAll${capitalDir}s'),
+  Create${capitalDir}: require('./Create${capitalDir}'),
+  Get${capitalDir}: require('./Get${capitalDir}'),
+  Update${capitalDir}: require('./Update${capitalDir}'),
+  Delete${capitalDir}: require('./Delete${capitalDir}')
+};
+`;
 const domain = `const { attributes } = require('structure');
 
 const ${capitalDir} = attributes({
   id: String,
+  name: String
 })(
   class ${capitalDir} {
   }
@@ -322,7 +333,7 @@ const ${capitalDir}sController = {
       })
       .on(ERROR, next);
 
-    get${capitalDir}.execute(Number(req.params.id));
+    get${capitalDir}.execute(req.params.id);
   },
 
   create(req, res, next) {
@@ -366,7 +377,7 @@ const ${capitalDir}sController = {
       })
       .on(ERROR, next);
 
-    update${capitalDir}.execute(Number(req.params.id), req.body);
+    update${capitalDir}.execute(req.params.id, req.body);
   },
 
   delete(req, res, next) {
@@ -385,7 +396,7 @@ const ${capitalDir}sController = {
       })
       .on(ERROR, next);
 
-    delete${capitalDir}.execute(Number(req.params.id));
+    delete${capitalDir}.execute(req.params.id);
   },
 };
 
@@ -446,12 +457,21 @@ fs.writeFile(
       : console.log(`Get${capitalDir} file created successfully!`)
 );
 fs.writeFile(
-  path.join(__dirname, `../src/app/${dir}/GetAll${capitalDir}.js`),
+  path.join(__dirname, `../src/app/${dir}/GetAll${capitalDir}s.js`),
   getAllCrud,
   (err) =>
     err
       ? console.error(err)
       : console.log(`GetAll${capitalDir} file created successfully!`)
+);
+
+fs.writeFile(
+  path.join(__dirname, `../src/app/${dir}/index.js`),
+  index,
+  (err) =>
+    err
+      ? console.error(err)
+      : console.log('index file created successfully!')
 );
 
 // create domain class
@@ -565,23 +585,27 @@ fs.writeFile(
 // container
 const containerModelImport = `  ${capitalDir}: ${capitalDir}Model,`;
 const containerImports =
-`  const {GetAll${capitalDir}s, Get${capitalDir}, Update${capitalDir}, Delete${capitalDir}} = require('./app/${dir}');
-  const ${capitalDir}Serializer = require('./interfaces/http/${dir}/${capitalDir}Serializer');
-  const Mongoose${capitalDir}sRepository = require('./infra/${dir}/Mongoose${capitalDir}sRepository');
+`const {Create${capitalDir}, GetAll${capitalDir}s, Get${capitalDir}, Update${capitalDir}, Delete${capitalDir}} = require('./app/${dir}');
+const ${capitalDir}Serializer = require('./interfaces/http/${dir}/${capitalDir}Serializer');
+const Mongoose${capitalDir}sRepository = require('./infra/${dir}/Mongoose${capitalDir}sRepository');
 `;
 const containerRepository = `  ${dir}sRepository: asClass(Mongoose${capitalDir}sRepository).singleton(),`;
 const containerDatabase = `  ${capitalDir}Model: asValue(${capitalDir}Model),`;
 const containerOperations = 
-`  get${capitalDir}: asClass(Get${capitalDir}),
+`  create${capitalDir}: asClass(Create${capitalDir}),
+  get${capitalDir}: asClass(Get${capitalDir}),
   update${capitalDir}: asClass(Update${capitalDir}),
   delete${capitalDir}: asClass(Delete${capitalDir}),
   getAll${capitalDir}s: asClass(GetAll${capitalDir}s),
 `;
 const containerSerializers = `  ${dir}Serializer: asValue(${capitalDir}Serializer),`;
+
+const flag = isWin ? '\r\n' : '\n';
 let ContainerText = fs
   .readFileSync(path.join(__dirname, '../src/container.js'))
   .toString()
-  .split('\n');
+  .split(flag);
+
 ContainerText.splice(ContainerText.indexOf('  User: UserModel,')+1, 0, containerModelImport);
 ContainerText.splice(ContainerText.indexOf('const MongooseUsersRepository = require(\'./infra/user/MongooseUsersRepository\');')+2, 0, containerImports);
 ContainerText.splice(ContainerText.indexOf('// Repositories')+2, 0, containerRepository);
@@ -600,3 +624,197 @@ fs.writeFile(
 );
 
 //swagger
+//paths
+swaggerDocument.paths[`/${dir}s/`] = {
+  'get': {
+    'operationId': `list${capitalDir}`,
+    'tags': [`${capitalDir}`],
+    'responses': {
+      '200': {
+        'description': `list of all ${capitalDir}`,
+        'content': {
+          'application/json': {
+            'schema': {
+              'type': 'array',
+              'items': {
+                '$ref': `#/components/schemas/${capitalDir}`
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  'post': {
+    'operationId': `register${capitalDir}`,
+    'tags': [
+      `${capitalDir}`
+    ],
+    'requestBody': {
+      'description': `${capitalDir} data`,
+      'required': true,
+      'content': {
+        'application/json': {
+          'schema': {
+            '$ref': `#/components/schemas/New${capitalDir}`
+          }
+        }
+      }
+    },
+    'responses': {
+      '201': {
+        'description': `${capitalDir} created successfully`,
+        'content': {
+          'application/json': {
+            'schema': {
+              '$ref': `#/components/schemas/${capitalDir}`
+            }
+          }
+        }
+      },
+      '400': {
+        'description': `${capitalDir} not created because of validation error`,
+        'content': {
+          'application/json': {
+            'schema': {
+              '$ref': '#/components/schemas/ValidationError'
+            }
+          }
+        }
+      }
+    }
+  }
+};
+  
+swaggerDocument.paths[`/${dir}s/{id}`] = {
+  'get': {
+    'operationId': `show${capitalDir}`,
+    'tags': [
+      `${capitalDir}`
+    ],
+    'parameters': [
+      {
+        'name': 'id',
+        'in': 'path',
+        'description': `Id of ${dir} to show`,
+        'required': true,
+        'type': 'string'
+      }
+    ],
+    'responses': {
+      '200': {
+        'description': `Return ${dir} with given id`,
+        'content': {
+          'application/json': {
+            'schema': {
+              '$ref': `#/components/schemas/${capitalDir}`
+            }
+          }
+        }
+      },
+      '404': {
+        'description': `${capitalDir} not found`,
+        'content': {
+          'application/json': {
+            'schema': {
+              '$ref': '#/components/schemas/NotFoundError'
+            }
+          }
+        }
+      }
+    }
+  },
+  'put': {
+    'operationId': `update${capitalDir}`,
+    'tags': [
+      `${capitalDir}`
+    ],
+    'parameters': [
+      {
+        'name': 'id',
+        'in': 'path',
+        'description': `Id of ${dir} to update`,
+        'required': true,
+        'type': 'string',
+      }
+    ],
+    'requestBody': {
+      'description': `${capitalDir} new data`,
+      'required': true,
+      'content': {
+        'application/json': {
+          'schema': {
+            '$ref': `#/components/schemas/New${capitalDir}`
+          }
+        }
+      }
+    },
+    'responses': {
+      '202': {
+        'description': `${capitalDir} updated successfully`,
+        'content': {
+          'application/json': {
+            'schema': {
+              '$ref': `#/components/schemas/${capitalDir}`
+            }
+          }
+        }
+      },
+      '404': {
+        'description': `${capitalDir} not found`,
+        'content': {
+          'application/json': {
+            'schema': {
+              '$ref': '#/components/schemas/NotFoundError'
+            }
+          }
+        }
+      }
+    },
+  },
+  'delete': {
+    'operationId': `delete${capitalDir}`,
+    'tags': [
+      `${capitalDir}`
+    ],
+    'parameters': [
+      {
+        'name': 'id',
+        'in': 'path',
+        'description': `Id of ${dir} to delete`,
+        'required': true,
+        'type': 'integer',
+        'format': 'int64'
+      }
+    ],
+    'responses': {
+      '202': {
+        'description': `${capitalDir} deleted successfully`
+      },
+      '404': {
+        'description': `${capitalDir} not found`,
+        'content': {
+          'application/json': {
+            'schema': {
+              '$ref': '#/components/schemas/NotFoundError'
+            }
+          }
+        }
+      }
+    }
+  }
+};
+  
+//schema
+swaggerDocument.components.schemas[`New${capitalDir}`] = {
+  'required': ['name'],
+  'type': 'object',
+  'properties': {
+    'name': {'type': 'string'}
+  }
+};
+fs.writeFile(path.join(__dirname, '../src/interfaces/http/swagger/swagger.json'), JSON.stringify(swaggerDocument), 
+  function (err) {
+    err ? console.log(err) : console.log('Swagger updated');
+  });
+  
