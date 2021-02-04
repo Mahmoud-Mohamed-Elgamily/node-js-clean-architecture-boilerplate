@@ -2,7 +2,7 @@ const { Router } = require('express');
 const { inject } = require('awilix-express');
 const Status = require('http-status');
 const jwt = require('jsonwebtoken');
-const authMiddleware = require('../middlewares/auth');
+// const authMiddleware = require('../middlewares/authMiddleware');
 
 const UsersController = {
   get router() {
@@ -11,12 +11,14 @@ const UsersController = {
     router.use(inject('userSerializer'));
 
     router.get('/', inject('getAllUsers'), this.index);
+    router.get('/single', inject('getUser'), this.show);
     router.post('/', inject('registerUser'), this.register);
     router.post('/login', inject('loginUser', 'config'), this.login);
     router.put('/:id', inject('updateUser'), this.update);
     router.delete('/:id', inject('deleteUser'), this.delete);
 
-    router.get('/single', [authMiddleware, inject('getUser')], this.show);
+    // example for using middleware
+    // router.get('/single', [authMiddleware, inject('getUser')], this.show);
 
     return router;
   },

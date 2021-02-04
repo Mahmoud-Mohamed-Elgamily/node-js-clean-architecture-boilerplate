@@ -3,7 +3,7 @@ const config = require('config');
 
 
 module.exports = function (req, res, next) {
-  const token = req.query.token;
+  const token = req.headers.token;
   console.log(token);
   if (!token) return res.status(401).json({ message: 'Auth Error' });
 
