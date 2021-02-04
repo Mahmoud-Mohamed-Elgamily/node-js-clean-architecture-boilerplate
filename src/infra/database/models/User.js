@@ -1,5 +1,5 @@
 'use strict';
-
+const mongoose_delete = require('mongoose-delete');
 module.exports = function (mongoose) {
   const { Schema } = mongoose;
   const UserSchema = new Schema({
@@ -25,7 +25,12 @@ module.exports = function (mongoose) {
       default: Date.now,
     },
   });
-  const User = mongoose.model('user', UserSchema);
 
+  UserSchema.plugin(mongoose_delete, {
+    deletedAt: true,
+    overrideMethods: true,
+  });
+
+  const User = mongoose.model('user', UserSchema);
   return User;
 };
