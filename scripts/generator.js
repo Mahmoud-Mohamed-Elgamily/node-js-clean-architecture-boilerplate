@@ -170,12 +170,10 @@ const ${capitalDir} = attributes({
   }
 );
 
-${capitalDir}.MIN_LEGAL_AGE = 21;
-
 module.exports = ${capitalDir};
 `;
 const model = `'use strict';
-
+const mongoose_delete = require('mongoose-delete');
 module.exports = function (mongoose) {
   const { Schema } = mongoose;
   const ${capitalDir}Schema = new Schema({
@@ -187,6 +185,11 @@ module.exports = function (mongoose) {
       type: Date,
       default: Date.now,
     },
+  });
+
+  ${capitalDir}Schema.plugin(mongoose_delete, {
+    deletedAt: true,
+    overrideMethods: true,
   });
   const ${capitalDir} = mongoose.model('${dir}', ${capitalDir}Schema);
 
@@ -225,24 +228,20 @@ class Mongoose${capitalDir}sRepository {
 
 
   async remove(_id) {
-    await this.${capitalDir}Model.findByIdAndRemove(_id);
+    await this.${capitalDir}Model.delete({ _id });
     return;
   }
 
   async update(_id, newData) {
-    const updated${capitalDir} = await this.${capitalDir}Model.findByIdAndUpdate(_id, newData, {
-      new: true,
-    });
-    const ${dir}Entity = ${capitalDir}Mapper.toEntity(updated${capitalDir});
-
-    const { valid, errors } = ${dir}Entity.validate();
-
-    if (!valid) {
-      const error = new Error('ValidationError');
-      error.details = errors;
-
-      throw error;
+    const updated${capitalDir} = await this.${capitalDir}Model.findOneAndUpdate({_id}, newData);
+    
+    if (!updated${capitalDir}) {
+      const notFoundError = new Error('NotFoundError');
+      notFoundError.details = \`${capitalDir} with id \${_id} can't be found.\`;
+      throw notFoundError;
     }
+
+    const ${dir}Entity = ${capitalDir}Mapper.toEntity(updated${capitalDir});
     return ${dir}Entity;
   }
 
@@ -252,7 +251,7 @@ class Mongoose${capitalDir}sRepository {
 
   async _getById(_id) {
     try {
-      return await this.${capitalDir}Model.findById(_id);
+      return await this.${capitalDir}Model.findOne({ _id });
     } catch (error) {
       if (error.name === 'SequelizeEmptyResultError') {
         const notFoundError = new Error('NotFoundError');
@@ -637,7 +636,7 @@ swaggerDocument.paths[`/${dir}s/`] = {
             'schema': {
               'type': 'array',
               'items': {
-                '$ref': `#/components/schemas/${capitalDir}`
+                '$ref': `#/components/schemas/New${capitalDir}`
               }
             }
           }
@@ -667,7 +666,7 @@ swaggerDocument.paths[`/${dir}s/`] = {
         'content': {
           'application/json': {
             'schema': {
-              '$ref': `#/components/schemas/${capitalDir}`
+              '$ref': `#/components/schemas/New${capitalDir}`
             }
           }
         }
@@ -707,7 +706,7 @@ swaggerDocument.paths[`/${dir}s/{id}`] = {
         'content': {
           'application/json': {
             'schema': {
-              '$ref': `#/components/schemas/${capitalDir}`
+              '$ref': `#/components/schemas/New${capitalDir}`
             }
           }
         }
@@ -755,7 +754,7 @@ swaggerDocument.paths[`/${dir}s/{id}`] = {
         'content': {
           'application/json': {
             'schema': {
-              '$ref': `#/components/schemas/${capitalDir}`
+              '$ref': `#/components/schemas/New${capitalDir}`
             }
           }
         }
@@ -813,6 +812,7 @@ swaggerDocument.components.schemas[`New${capitalDir}`] = {
     'name': {'type': 'string'}
   }
 };
+
 fs.writeFile(path.join(__dirname, '../src/interfaces/http/swagger/swagger.json'), JSON.stringify(swaggerDocument), 
   function (err) {
     err ? console.log(err) : console.log('Swagger updated');
